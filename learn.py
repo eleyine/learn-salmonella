@@ -14,7 +14,7 @@ The algorithm is based on the paper from Yang et al.:
 "Positive-Unlabeled Learning for Disease Gene Identification" (2012)
 '''
 
-class PUDI_FeatureSelection:
+class PUDI_FeatureSelection(base.BaseEstimator, base.TransformerMixin):
     '''
     Choose distinguishing features that either frequently occured in the 
     disease gene set P but seldom occured in unlabled gene set U (assuming 
@@ -24,9 +24,25 @@ class PUDI_FeatureSelection:
     def __init__(self, percentile):
         self.percentile = percentile
 
-    def fit_transform(self, x, y):
-        positive = filter_by_label(x, y, label=1)
-        unknown = filter_by_label(x,y, label=0)
+    def fit_transform(self, X, y):
+        '''
+        Fit model to data and subsequently transform the data
+
+        Parameters
+        ----------
+        X : numpy array, shape = [n_genes, n_features]
+            Training set.
+
+        y : numpy array of shape [n_genes]
+            Target values.
+
+        Returns
+        -------
+        Xt : numpy array, shape = [n_genes, reduced_n_features]
+             The training set with reduced features.
+        '''
+        positive = filter_by_label(X, y, label=1)
+        unknown = filter_by_label(X,y, label=0)
         da = _discriminating_ability_score(positive, unknown)
 
         # get the indices of the highest discriminating features
@@ -35,8 +51,8 @@ class PUDI_FeatureSelection:
         # resize X to only include p best features
         k = int(x.shape[1] * self.percentile / float(100))
         k_best_indices = da_sorted_indices[:k]
-        x = x[:,k_best_indices]
-        return x
+        Xt = X[:,k_best_indices]
+        return Xt
 
     def _discriminating_ability_score(self, positive, unknown):
         '''
