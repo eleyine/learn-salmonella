@@ -3,6 +3,7 @@ from sklearn import svm, cross_validation, pipeline, feature_selection, decompos
 import pylab as pl
 from scipy import stats
 import ConfigParser
+import math
 
 '''
 A set of functions to predict genes involved in reaction to Salmonella using
@@ -20,17 +21,61 @@ class PUDI_FeatureSelection:
     large porition of unknown genes are still negatives) or frequently
     occurred in U but seldom occured in P.
     '''
-    def __init__(self):
-        pass
+    def __init__(self, percentile):
+        self.percentile = percentile
 
-    def transform(self):
-        pass
+    def fit_transform(self, x, y):
+        positive = filter_by_label(x, y, label=1)
+        unknown = filter_by_label(x,y, label=0)
+        da = _discriminating_ability_score(positive, unknown)
 
+        # get the indices of the highest discriminating features
+        da_sorted_indices = da.argsort[::-1] # decreasing order
 
+        # resize X to only include p best features
+        k = int(x.shape[1] * self.percentile / float(100))
+        k_best_indices = da_sorted_indices[:k]
+        x = x[:,k_best_indices]
+        return x
 
+    def _discriminating_ability_score(self, positive, unknown):
+        '''
+        Compute the discriminating ability of each TFBS.
 
+        Parameters
+        ----------
+            positive: 2D nparray, shape = (n_pos, n_tfbs)
+            The positive dataset in which every gene is involved in the
+            reaction to Salmonella.
 
-    def _affinity_vector(gene_set):
+            unknown: 2D nparray, shape = (n_unk, n_tfbs)
+            The negative dataset in which genes are not currently known to 
+            be involved in the reaction to Salmonella.
+
+        Returns
+        -------
+            da: 1D nparray, shape = (n_tfbs)
+        '''
+        assert positive.shape[1] == unknown.shape[1]
+        n_pos = positive.shape[0]
+        n_unk = unknown.shape[0]
+        n_tfbs = positive.shape[1]
+        pos_aff = _affinity_vector(positive)
+        unk_aff = _affinity_vector(unknown)
+
+        da = np.zeros(n_tfbs)
+
+        for i in range(n_tfbs):
+            # avoid dividing by 0
+            if pos_aff[i] == 0 or unk_aff[i] == 0:
+                da[i] = 0.000000000001 # lol
+            else:
+                da[i] = (pos_aff[i] + unk_aff[i]) * \ 
+                        math.log( (n_pos / float(pos_aff[i])) + \
+                                  (n_unk / float(unk_aff[i])) )
+        return da
+
+    def _affinity_vector(self, gene_set):
         '''
         Compute the affinity count in the gene set.
 
