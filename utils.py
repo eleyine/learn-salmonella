@@ -15,7 +15,8 @@ __all__ = ['Indent',
            'get_feature_labels',
            'get_x',
            'get_y',
-           'log']
+           'log',
+           'filter_by_label']
 
 class Indent:
     def __init__(self):
@@ -233,6 +234,29 @@ def get_y(organism='human', logger=Logger(verbose_level=1)):
     np.save(f, org_y)
     f.close()
     return org_y
+
+def filter_by_label(x, y, label=1):
+    '''
+    Return subset of genes corresponding to the given label.
+
+    Parameters
+    ----------    
+        label: integer
+        1 if positive (gene is involved in reaction to Salmonella), 
+        0 if unknown
+
+    Returns
+    --------
+        xsubset: 2D nparray
+        The subset of genes corresponding to the given label
+
+        ysubset: 1D nparray
+        The subset of outputs corresponding to the given label for convenience.
+        This essentially returns an array [label] * occurences_of_label.
+    '''
+    mask = [ obs == label for obs in y]
+    mask = np.array(mask, dtype=bool)
+    return (x[mask], y[mask])
 
 def store(filename, obj):
     '''
