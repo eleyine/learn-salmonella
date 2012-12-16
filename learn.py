@@ -213,6 +213,35 @@ class PUDI_SampleSelection(base.BaseEstimator, base.TransformerMixin):
             dist[i] = np.linalg.norm(pr-U[i])
         return dist
 
+class PUDI_Classifier(base.BaseEstimator, base.ClassifierMixin):
+
+    # TODO add default values once you know what works well
+    def __init__(self,
+                feature_percentile,
+                sample_percentile,
+                C,
+                positive_weight,
+                ):
+    self.feature_percentile = feature_percentile
+    self.sample_percentile = sample_percentile
+    self.C = C
+    self.positive_weight
+    self.feature_selection = PUDI_FeatureSelection(
+        percentile=feature_percentile)
+    self.sample_selection = PUDI_FeatureSelection(
+        percentile=feature_percentile)
+
+
+    def fit(self, X, y):
+        '''
+        Fit the SVM model according to the given training data
+        '''
+        X = self.feature_selection.fit_transform(X, y)
+        X = self.sample_selection.fit_transform(X, y)
+        self.clf = svm.SVC(C=self.C).fit(X, y)
+        return self
+
+
 def collect_stats_anova():
     '''
     Plot graphs on performance of SVM classifier varying feature selection.
@@ -260,23 +289,8 @@ config = ConfigParser.ConfigParser()
 config.read('config.ini')
 
 if __name__ == '__main__':
-    collect_stats_anova()
-
-    positives = [] # 2D [|p|, |tfbs|]
-    tfbs_count = [0] * positives[0]
-    for positive in positives:
-        for i in range(len(positive)):
-            tfbs[i] += positive[i]
-    pr = [i / float(len(positives)) for i in tfbs]
-
-    negatives = [] # 2D negative samples [|n|, tfbs]
-    n_tfbs = len(pr)
-    avg_distance = 0
-    for negative in negatives:
-        difference = sum([pow(pr[j] - negative[j], 2) for j in range(n_tfbs)])
-        avg_distance += difference
-
-    avg_distance = avg_distance / float(len(negatives))
+    # collect_stats_anova()
+    pass
 
 
 
