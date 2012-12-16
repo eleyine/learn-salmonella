@@ -42,14 +42,14 @@ class PUDI_FeatureSelection(base.BaseEstimator, base.TransformerMixin):
              The training set with reduced features.
         '''
         positive = filter_by_label(X, y, label=1)
-        unknown = filter_by_label(X,y, label=0)
+        unknown = filter_by_label(X, y, label=0)
         da = _discriminating_ability_score(positive, unknown)
 
         # get the indices of the highest discriminating features
         da_sorted_indices = da.argsort[::-1] # decreasing order
 
         # resize X to only include p best features
-        k = int(x.shape[1] * self.percentile / float(100))
+        k = int(X.shape[1] * self.percentile / float(100))
         k_best_indices = da_sorted_indices[:k]
         Xt = X[:,k_best_indices]
         return Xt
@@ -124,6 +124,94 @@ class PUDI_FeatureSelection(base.BaseEstimator, base.TransformerMixin):
         for i in range(n_tfbs):
             aff[i] = sum([1 if n > 0 else 0 for n in gene_set[:, i]])
         return aff
+
+class PUDI_SampleSelection(base.BaseEstimator, base.TransformerMixin):
+    '''
+    Given that we do not have any negative genes, the first step is to 
+    extract a set of reliable negative genes RN from U by computing the
+    dissimilarities of the unlabeled genes.
+    '''
+    def __init__(self, percentile):
+        self.percentile = percentile
+
+    def fit_transform(self, X, y):
+        '''
+        Fit model to data and subsequently transform the data
+
+        Parameters
+        ----------
+        X : numpy array, shape = [n_genes, n_features]
+            Training set.
+
+        y : numpy array of shape [n_genes]
+            Target values.
+
+        Returns
+        -------
+        Xt : numpy array, shape = [n_genes, reduced_n_features]
+             The training set with reduced features.
+        '''
+        P = filter_by_label(X, y, label=1)
+        U = filter_by_label(X, y, label=0)
+        pr = _positive_representative_vector(P)
+        dist = _distances(U, pr)
+
+        # get the indices of the most dissimilar genes from pr
+        dist_sorted_indices = dist.argsort[::-1] # decreasing order
+
+        # resize X to only include all the genes in P + the p most dissimilar 
+        # genes in U
+        k = int(U.shape[0] * self.percentile / float(100))
+        k_best_indices = dist_sorted_indices[:k]
+        reduced_U = U[k_best_indices]
+        Xt = np.concatenate((P, reduced_U))
+        return Xt
+
+    def _positive_representative_vector(self, P):
+        '''
+        Build a "positive representative vector" (pr) by summing up the 
+        genes in P and normalizing it.
+
+        Parameters
+        ----------
+            P: 2D nparray, shape = (n_pos, n_tfbs)
+            The positive dataset in which every gene is involved in the
+            reaction to Salmonella.
+
+        Returns
+        -------
+            pr: 1D nparray, shape = (n_pos)
+            The positive representative vector.
+        '''
+        n_pos = P.shape[0]
+        return P.sum(axis=1) / float(n_pos)
+
+    def _distances(self, U, pr):
+        '''
+        Compute the distance of each gene g_i in U from pr using the Euclidean 
+        distance
+
+        Parameters
+        ----------
+            U: 2D nparray, shape = (n_unk, n_tfbs)
+            The unknown dataset in which every gene is not currently known to 
+            be involved in the reaction to Salmonella.
+
+            pr: 1D nparray, shape = (n_pos)
+            The positive representative vector.
+
+        Returns
+        -------
+            dist: 1D nparray, shape = (n_unk)
+            The average Eucledian distance from the positive representative 
+            vector for all genes in U.
+        '''
+        n_tfbs = pr.shape[0]
+        n_unk = U.shape[0]
+        dist = np.zeros(n_unk)
+        for i in range(n_unk):
+            dist[i] = np.linalg.norm(pr-U[i])
+        return dist
 
 def collect_stats_anova():
     '''
