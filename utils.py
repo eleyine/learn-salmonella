@@ -11,6 +11,7 @@ import os
 
 __all__ = ['Indent',
            'Logger',
+           'StatsTracker',
            'get_sample_labels',
            'get_feature_labels',
            'get_x',
@@ -19,8 +20,8 @@ __all__ = ['Indent',
            'filter_by_label']
 
 class Indent:
-    def __init__(self):
-        self.indent = ''
+    def __init__(self, indent=''):
+        self.indent = indent
         self.single_indent = '    '
 
     def increment(self):
@@ -94,10 +95,54 @@ class Logger:
         return message
 
     def clone(self):
-        return Logger(verbose_level=self.verbose, indent=self.indent)
+        return Logger(verbose_level=self.verbose, indent=Indent(str(self.indent)))
 
+class StatsTracker:
+    '''
+    Really basic and hacky stats tracker. Ugh, don't know how to do 
+    this in a better way.
+    '''
+    def __init__(self):
+        self.config = ConfigParser.ConfigParser()
+        self.config.read('config.ini')
+        f = open(self.config.get('Stats', 'tracker'), 'r')
+        self.memory = json.load(f)
+        f.close()
 
-def get_sample_labels(organism='human', logger=Logger(verbose_level=1)):
+    def add(self, key, value):
+        try:
+            self.current[key] = value
+        except:
+            self.new()
+            self.current[key] = value
+
+    def new(self, title=None):
+        '''
+        Add memory object
+        '''
+        if title is None:
+            title = 'data' + str(len(self.memory) + 1)
+        while True:
+            n = 1
+            if title in self.memory.keys():
+                # avoid duplicates
+                title += '_'+ str(n)
+                n += 1
+            else:
+                break
+        logger.debug('New memory object %s' % (title))
+        self.current = {}
+        self.memory[title] = self.current
+
+    def store(self, fn=None):
+        logger.debug('Storing stats.')
+        if fn is None:
+            fn = self.config.get('Stats', 'tracker')
+        f = open(fn, 'w')
+        json.dump(self.memory, f, indent=2, sort_keys=True)
+        f.close()
+
+def get_sample_labels(organism='human', logger=Logger(verbose_level=0)):
     ''' 
     Get gene labels and return str numpy array of shape [samples]. 
     '''
@@ -131,7 +176,7 @@ def get_sample_labels(organism='human', logger=Logger(verbose_level=1)):
     f.close()
     return org_genes 
 
-def get_feature_labels(logger=Logger(verbose_level=1)):
+def get_feature_labels(logger=Logger(verbose_level=0)):
     ''' 
     Get TFBS feature labels and return str numpy array of shape [features]. 
     '''
@@ -165,7 +210,7 @@ def get_feature_labels(logger=Logger(verbose_level=1)):
     f.close()
     return tfbs 
 
-def get_x(organism='human', logger=Logger(verbose_level=1)):
+def get_x(organism='human', logger=Logger(verbose_level=0)):
     ''' 
     Parse x (int) features corresponding to given organism and return numpy 
     array of shape [samples, features]. 
@@ -200,7 +245,7 @@ def get_x(organism='human', logger=Logger(verbose_level=1)):
     f.close()
     return org_x
 
-def get_y(organism='human', logger=Logger(verbose_level=1)):
+def get_y(organism='human', logger=Logger(verbose_level=0)):
     ''' 
     Parse y (int) class vector corresponding to given organism and return 
     numpy array of shape [samples]. 
@@ -235,7 +280,7 @@ def get_y(organism='human', logger=Logger(verbose_level=1)):
     f.close()
     return org_y
 
-def filter_by_label(x, y, label=1):
+def filter_by_label(x, y, label):
     '''
     Return subset of genes corresponding to the given label.
 
@@ -394,7 +439,10 @@ config.read('config.ini')
 
 if __name__ == '__main__':
     # extract_data()
-    # print get_y()
+    x,y = filter_by_label(get_x(), get_y(), label=0)
+    print x.shape
+    print y.shape
+    print get_x().shape
     # print get_feature_labels()
     # print get_sample_labels()
     # print get_sample_labels(organism='mouse')
